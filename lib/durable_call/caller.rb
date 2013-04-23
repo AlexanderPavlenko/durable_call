@@ -13,9 +13,11 @@ module DurableCall
     }.freeze
 
     MESSAGES = {
-      :new_retry => "Retry #%1$i",
-      :failed_call => "Failed to call %1$s on %2$s: %3$s",
-      :waiting_before_retry => "Waiting %1$.2f seconds before retry",
+      :new_retry => 'Retry #%1$i',
+      :failed_call => 'Failed to call %1$s on %2$s: %3$s',
+      :waiting_before_retry => 'Waiting %1$.2f seconds before retry',
+      :retries_error => 'Number of retries exceeded: %1$i',
+      :timeout_error => 'Timeout exceeded: %1$.2f',
     }.freeze
 
     attr_reader :subject
@@ -38,6 +40,7 @@ module DurableCall
         called = false
         result = nil
         (0..@retries).each do |retries_counter|
+          # @timeout may be exceeded here and exception will be raised
           begin
             if retries_counter > 0
               # first try isn't "retry"
@@ -45,15 +48,11 @@ module DurableCall
             end
             result = @subject.__send__ *args
             called = true
-          rescue Timeout::Error => ex
-            # just reraise exception if @timeout exceeded
-            raise
           rescue => ex
-            # @timeout may be exceeded here and exception will be raised
             log :warn, :failed_call, args.inspect, @subject, ex.inspect
             if @interval && retries_counter < @retries
               # interval specified and it's not a last iteration
-              sleep_before_retry retries_counter
+              sleep_before_retry(retries_counter + 1)
             end
           else
             break
@@ -62,9 +61,13 @@ module DurableCall
         if called
           result
         else
-          raise RetriesError, "Number of retries exceeded: #{@retries}"
+          log :error, :retries_error, @retries
+          raise RetriesError
         end
       end
+    rescue TimeoutError
+      log :error, :timeout_error, @timeout
+      raise
     end
 
   private

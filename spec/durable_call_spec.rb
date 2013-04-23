@@ -56,7 +56,9 @@ describe DurableCall do
   it 'invokes long method' do
     @wrapper = DurableCall::Caller.new(@subject, :timeout => 0.1, :logger => @logger)
     expect{ @wrapper.call(:long_method, 1) }.to raise_error(DurableCall::TimeoutError)
-    @log.string.should == ''
+    valid_log?(@log.string, [
+      /E.*Timeout exceeded: 0.10/,
+    ]).should == true
   end
 
   it 'invokes not so long method' do
@@ -71,18 +73,48 @@ describe DurableCall do
     expect{ @wrapper.call(:failing_method, condition) }.to raise_error(DurableCall::RetriesError)
   end
 
-  it 'invokes failing method with logging' do
+  it 'invokes failing method with constant intervals and logging' do
     @wrapper = DurableCall::Caller.new(@subject, :retries => 2, :interval => 0.0123, :logger => @logger)
     (condition = mock).should_receive(:call).exactly(3).times.and_return(true)
     expect{ @wrapper.call(:failing_method, condition) }.to raise_error(DurableCall::RetriesError)
     valid_log?(@log.string, [
-        error   = /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
-        waiting = /I.*Waiting 0\.01 seconds before retry/,
-        /I.*Retry \#1/,
-        error,
-        waiting,
-        /I.*Retry \#2/,
-        error,
+      error   = /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
+      waiting = /I.*Waiting 0\.01 seconds before retry/,
+      /I.*Retry \#1/,
+      error,
+      waiting,
+      /I.*Retry \#2/,
+      error,
+      /E.*Number of retries exceeded: 2/,
+    ]).should == true
+  end
+
+  it 'invokes failing method with :rand intervals and logging' do
+    @wrapper = DurableCall::Caller.new(@subject, :retries => 1, :logger => @logger)
+    (condition = mock).should_receive(:call).exactly(2).times.and_return(true)
+    expect{ @wrapper.call(:failing_method, condition) }.to raise_error(DurableCall::RetriesError)
+    valid_log?(@log.string, [
+      error = /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
+      /I.*Waiting [01]\.\d\d seconds before retry/,
+      /I.*Retry \#1/,
+      error,
+      /E.*Number of retries exceeded: 1/,
+    ]).should == true
+  end
+
+  it 'invokes failing method with custom intervals and logging' do
+    @wrapper = DurableCall::Caller.new(@subject, :retries => 2, :interval => lambda{|i| i / 100.0 }, :logger => @logger)
+    (condition = mock).should_receive(:call).exactly(3).times.and_return(true)
+    expect{ @wrapper.call(:failing_method, condition) }.to raise_error(DurableCall::RetriesError)
+    valid_log?(@log.string, [
+      error   = /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
+      /I.*Waiting 0\.01 seconds before retry/,
+      /I.*Retry \#1/,
+      error,
+      /I.*Waiting 0\.02 seconds before retry/,
+      /I.*Retry \#2/,
+      error,
+      /E.*Number of retries exceeded: 2/,
     ]).should == true
   end
 
@@ -91,9 +123,9 @@ describe DurableCall do
     (condition = mock).should_receive(:call).twice.and_return(true, false)
     @wrapper.call(:failing_method, condition).should == true
     valid_log?(@log.string, [
-        /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
-        /I.*Waiting 0\.01 seconds before retry/,
-        /I.*Retry \#1/,
+      /W.*Failed to call \[\:failing_method, .*RuntimeError\: it happens/,
+      /I.*Waiting 0\.01 seconds before retry/,
+      /I.*Retry \#1/,
     ]).should == true
   end
 
@@ -102,8 +134,9 @@ describe DurableCall do
     (condition = mock).should_receive(:call).once.and_return(true)
     expect{ @wrapper.call(:worse_method, 0.05, condition) }.to raise_error(DurableCall::TimeoutError)
     valid_log?(@log.string, [
-        /W.*Failed to call \[\:worse_method, .*RuntimeError\: it happens/,
-        /I.*Waiting 0\.05 seconds before retry/,
+      /W.*Failed to call \[\:worse_method, .*RuntimeError\: it happens/,
+      /I.*Waiting 0\.05 seconds before retry/,
+      /E.*Timeout exceeded: 0.10/,
     ]).should == true
   end
 
@@ -113,8 +146,8 @@ describe DurableCall do
   end
 
   def valid_log?(log, regexps)
-    raise ArgumentError if log.lines.count != regexps.size
     # puts "#{'-' * 20}\n", log
+    raise ArgumentError if log.lines.count != regexps.size
     log.lines.zip(regexps).all?{|(string, regexp)| string =~ regexp }
   end
 end

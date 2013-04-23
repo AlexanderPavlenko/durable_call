@@ -31,7 +31,7 @@ Multiple arguments and options:
 Where ```options``` may take:
 
     {
-      :interval  # 1. lambda, which takes retries number and returns seconds to sleep
+      :interval  # 1. lambda, which takes retry number (min 1) and returns seconds to sleep
                  # 2. just Float
                  # 3. Symbol for built-in strategies, defaults to :rand
       :logger    # Logger object, defaults to nil
