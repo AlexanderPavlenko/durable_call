@@ -39,7 +39,10 @@ module DurableCall
         result = nil
         (0..@retries).each do |retries_counter|
           begin
-            @logger.info MESSAGES[:new_retry] % retries_counter if retries_counter > 0 if @logger
+            if retries_counter > 0
+              # first try isn't "retry"
+              log :info, :new_retry, retries_counter
+            end
             result = @subject.__send__ *args
             called = true
           rescue Timeout::Error => ex
@@ -47,21 +50,10 @@ module DurableCall
             raise
           rescue => ex
             # @timeout may be exceeded here and exception will be raised
-            @logger.warn MESSAGES[:failed_call] % [args.inspect, @subject, ex.inspect] if @logger
+            log :warn, :failed_call, args.inspect, @subject, ex.inspect
             if @interval && retries_counter < @retries
               # interval specified and it's not a last iteration
-              seconds = if @interval.is_a? Symbol
-                INTERVALS[@interval].call(retries_counter)
-              elsif @interval.respond_to?(:call)
-                @interval.call(retries_counter)
-              else
-                @interval
-              end
-              # sleep before next retry if needed
-              if seconds > 0
-                @logger.info MESSAGES[:waiting_before_retry] % seconds if @logger
-                sleep seconds
-              end
+              sleep_before_retry retries_counter
             end
           else
             break
@@ -73,6 +65,28 @@ module DurableCall
           raise RetriesError, "Number of retries exceeded: #{@retries}"
         end
       end
+    end
+
+  private
+
+    def sleep_before_retry(retries_counter)
+      seconds = if @interval.is_a? Symbol
+        INTERVALS[@interval].call(retries_counter)
+      elsif @interval.respond_to?(:call)
+        @interval.call(retries_counter)
+      else
+        @interval
+      end
+      # sleep before next retry if needed
+      if seconds > 0
+        log :info, :waiting_before_retry, seconds
+        sleep seconds
+      end
+    end
+
+    def log(level, message, *args)
+      return unless @logger
+      @logger.send level, MESSAGES[message] % args
     end
   end
 end
