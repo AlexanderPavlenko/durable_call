@@ -2,6 +2,8 @@
 
 Invoke methods DRY and safely with parameterized retries, timeouts and logging
 
+[![Travis CI](https://secure.travis-ci.org/AlexanderPavlenko/durable_call.png)](https://travis-ci.org/AlexanderPavlenko/durable_call)
+
 ## Installation
 
 Add this line to your application's Gemfile:
