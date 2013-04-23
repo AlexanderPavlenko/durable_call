@@ -40,11 +40,16 @@ Where ```options``` may take:
       :timeout   # operation timeout, defaults to nil (no time limits)
     }
 
-Also, it's possible to perform multiple calls with the same options:
+It's possible to perform multiple calls with the same options:
 
     caller = DurableCall::Caller.new(Something.new, options)
     caller.call(:method_name, :param, :other_param)
     caller.call(:faster_faster, :no_instantiation_overhead)
+
+If method doesn't raise any exceptions, it's possible to validate its result:
+
+    def sporadic_method; rand end
+    DurableCall.call(self, :sporadic_method, :retries => 1/0.0, :logger => Logger.new(STDOUT)){|i| i > 0.99 }
 
 ## Contributing
 

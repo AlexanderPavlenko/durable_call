@@ -21,6 +21,9 @@ describe DurableCall do
         raise RuntimeError.new("it happens") if condition.call
         true
       end
+      def quiet_method(condition)
+        condition.call
+      end
     end.freeze
     @subject = @subject_class.new.freeze
   end
@@ -47,7 +50,7 @@ describe DurableCall do
     @wrapper.subject.should === @subject
   end
 
-  it 'invokes simple methods' do
+  it 'invokes simple method' do
     @wrapper = DurableCall::Caller.new(@subject, :logger => @logger)
     @wrapper.call(:simple_method).should == true
     @log.string.should == ''
@@ -140,9 +143,20 @@ describe DurableCall do
     ]).should == true
   end
 
+  it 'invokes quiet method' do
+    @wrapper = DurableCall::Caller.new(@subject, :retries => 2, :logger => @logger)
+    (condition = mock).should_receive(:call).twice.and_return(false, true)
+    @wrapper.call(:quiet_method, condition){|result| result }.should == true
+    valid_log?(@log.string, [
+        /W.*Failed to call \[\:quiet_method.*Invalid result\: false/,
+        /I.*Retry \#1/,
+    ]).should == true
+  end
+
   it 'has shorthand module method' do
-    DurableCall.call(@subject, :simple_method)
-    DurableCall.call(@subject, [:long_method, 0.01], {:logger => @logger, :timeout => 0.1})
+    DurableCall.call(@subject, :simple_method).should == true
+    DurableCall.call(@subject, [:long_method, 0.01], {:logger => @logger, :timeout => 0.1}).should == true
+    DurableCall.call(@subject, [:quiet_method, lambda{ false }]){|result| !result }.should == false
   end
 
   def valid_log?(log, regexps)
