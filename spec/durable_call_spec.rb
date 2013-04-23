@@ -146,7 +146,7 @@ describe DurableCall do
   end
 
   def valid_log?(log, regexps)
-    # puts "#{'-' * 20}\n", log
+    puts "#{'-' * 20}\n", log
     raise ArgumentError if log.lines.count != regexps.size
     log.lines.zip(regexps).all?{|(string, regexp)| string =~ regexp }
   end
