@@ -3,6 +3,7 @@
 Invoke methods DRY and safely with parameterized retries, timeouts and logging
 
 [![Travis CI](https://secure.travis-ci.org/AlexanderPavlenko/durable_call.png)](https://travis-ci.org/AlexanderPavlenko/durable_call)
+[![Coverage Status](https://coveralls.io/repos/AlexanderPavlenko/durable_call/badge.png?branch=master)](https://coveralls.io/r/AlexanderPavlenko/durable_call)
 
 ## Installation
 
